@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REPO = 'dockerabhi98/dev'
+        DOCKER_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+    }
+
+    triggers {
+        pollSCM('* * * * *') // Checks for changes every minute (adjust as needed)
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    if (env.BRANCH_NAME != 'develop') {
+                        error("This pipeline only runs for the 'develop' branch.")
+                    }
+                }
+                checkout scm
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                script {
+                    echo "Running linting rules..."
+                }
+                sh 'npm install'
+                sh 'npm run lint'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "Building Docker image..."
+                }
+                sh "docker build -t ${env.DOCKER_REPO}:${DOCKER_TAG} ."
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    echo "Pushing Docker image to Docker Hub..."
+                }
+                withCredentials([usernamePassword(credentialsId: 'docker_hub_credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${env.DOCKER_REPO}:${DOCKER_TAG}
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build, linting, and Docker push completed successfully."
+        }
+        failure {
+            echo "Pipeline failed."
+        }
+    }
+}
