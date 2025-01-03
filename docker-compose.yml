@@ -1,0 +1,9 @@
+---
+version: '3'
+services:
+  apping:
+  image: vasavivodnala/apping:latest
+    ports:
+      - "80:80"
+    restart: always
+---
